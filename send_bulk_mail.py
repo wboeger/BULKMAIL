@@ -17,7 +17,10 @@ import smtplib
 import sys
 import time
 from datetime import datetime, timezone
-from email.message import EmailMessage
+from email.mime.image import MIMEImage
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.utils import formataddr
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -86,26 +89,32 @@ def already_sent(log_path):
 
 
 def build_message(cfg, subject, text_body, html_body, images, to_email):
-    msg = EmailMessage()
-    from_header = f"{cfg['from_name']} <{cfg['from_email']}>" if cfg["from_name"] else cfg["from_email"]
-    msg["From"] = from_header
-    msg["To"] = to_email
-    msg["Subject"] = subject
+    # multipart/related > multipart/alternative(text, html) > inline images (siblings)
+    # This ordering (related as the outermost container) is the structure Outlook /
+    # Exchange render most reliably; images nested the other way around often show
+    # up as attachments instead of inline in the body on those clients.
+    root = MIMEMultipart("related")
+    root["From"] = formataddr((cfg["from_name"], cfg["from_email"])) if cfg["from_name"] else cfg["from_email"]
+    root["To"] = to_email
+    root["Subject"] = subject
     if cfg["reply_to"]:
-        msg["Reply-To"] = cfg["reply_to"]
+        root["Reply-To"] = cfg["reply_to"]
 
-    msg.set_content(text_body)
-    msg.add_alternative(html_body, subtype="html")
+    alt = MIMEMultipart("alternative")
+    root.attach(alt)
+    alt.attach(MIMEText(text_body, "plain", "utf-8"))
+    alt.attach(MIMEText(html_body, "html", "utf-8"))
 
-    # Attach images as inline (CID) parts on the HTML part so <img src="cid:name"> resolves.
-    html_part = msg.get_payload()[1]
     for cid, path in images.items():
         ctype, _ = mimetypes.guess_type(path.name)
         maintype, subtype = (ctype or "application/octet-stream").split("/", 1)
         with open(path, "rb") as f:
-            html_part.add_related(f.read(), maintype=maintype, subtype=subtype, cid=f"<{cid}>")
+            img = MIMEImage(f.read(), _subtype=subtype)
+        img.add_header("Content-ID", f"<{cid}>")
+        img.add_header("Content-Disposition", "inline", filename=path.name)
+        root.attach(img)
 
-    return msg
+    return root
 
 
 def send_all(args):

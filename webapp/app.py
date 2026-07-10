@@ -27,6 +27,23 @@ from send_bulk_mail import build_message, render  # noqa: E402
 UPLOAD_DIR = ROOT / "webapp" / "_uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+
+def friendly_smtp_error(exc):
+    text = str(exc)
+    if "SendAsDenied" in text:
+        return (
+            "O servidor recusou o envio porque o e-mail do remetente e diferente "
+            "do e-mail usado para login. No campo \"E-mail do remetente\", deixe em "
+            "branco (usa automaticamente seu usuario SMTP) ou use o mesmo endereco "
+            "com que voce fez login."
+        )
+    if "Authentication" in text or "authentication" in text or "535" in text:
+        return (
+            "Falha de autenticacao no servidor SMTP. Confira usuario e senha, e "
+            "se sua conta exige senha de aplicativo (app password) em vez da senha normal."
+        )
+    return text if len(text) < 300 else text[:300] + "..."
+
 app = Flask(__name__)
 
 
@@ -127,7 +144,7 @@ def send():
                     smtp.starttls()
                 smtp.login(cfg["user"], cfg["password"])
             except Exception as exc:
-                return render_template("result.html", error=f"Falha ao conectar/autenticar no SMTP: {exc}", results=[])
+                return render_template("result.html", error=f"Falha ao conectar/autenticar no SMTP: {friendly_smtp_error(exc)}", results=[])
 
         try:
             for i, row in enumerate(recipients):
@@ -146,7 +163,7 @@ def send():
                         if cfg["delay"] > 0 and i < len(recipients) - 1:
                             time.sleep(cfg["delay"])
                 except Exception as exc:
-                    results.append({"email": email, "status": "falhou", "error": str(exc)})
+                    results.append({"email": email, "status": "falhou", "error": friendly_smtp_error(exc)})
         finally:
             if smtp is not None:
                 smtp.quit()

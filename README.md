@@ -13,7 +13,10 @@ pip install -r requirements.txt
 python3 webapp/app.py
 ```
 
-Then open **http://127.0.0.1:5000**. Fill in your SMTP login, subject,
+Then open **http://127.0.0.1:5001**. (Default port is 5001, not 5000,
+because macOS usually has AirPlay Receiver bound to port 5000 already —
+override with `PORT=8000 python3 webapp/app.py` if 5001 is also busy.)
+Fill in your SMTP login, subject,
 message text, upload images, and paste/upload your recipients CSV. It only
 listens on localhost (not exposed to the internet), and your password is
 used only for that one request — it's never written to disk. Always leave

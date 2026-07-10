@@ -3,14 +3,19 @@
 
 Run with:
     python3 webapp/app.py
-Then open http://127.0.0.1:5000 in your browser.
+Then open http://127.0.0.1:5001 in your browser.
 
 Nothing here is exposed to the internet by default -- it only listens on
 localhost. Your SMTP password is used in-memory for the request and is
 never written to disk.
+
+Note: default port is 5001, not 5000, because on macOS port 5000 is
+usually taken by the AirPlay Receiver system service. Override with the
+PORT environment variable if 5001 is also busy, e.g. PORT=8000 python3 webapp/app.py
 """
 import csv
 import io
+import os
 import shutil
 import smtplib
 import sys
@@ -174,4 +179,5 @@ def send():
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=False)
+    port = int(os.environ.get("PORT", 5001))
+    app.run(host="127.0.0.1", port=port, debug=False)

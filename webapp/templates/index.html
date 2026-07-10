@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bulk Mail</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, Segoe UI, Arial, sans-serif; max-width: 720px; margin: 32px auto; padding: 0 16px; line-height: 1.5; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .subtitle { color: #666; font-size: 14px; margin-bottom: 24px; }
+  fieldset { border: 1px solid #ddd; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }
+  legend { font-weight: 600; padding: 0 6px; }
+  label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 4px; }
+  input[type=text], input[type=email], input[type=password], input[type=number], textarea {
+    width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px;
+  }
+  textarea { resize: vertical; }
+  .row { display: flex; gap: 16px; }
+  .row > div { flex: 1; }
+  .check-row { display: flex; align-items: center; gap: 8px; margin: 12px 0; }
+  .check-row label { margin: 0; font-weight: normal; }
+  .hint { color: #888; font-size: 12px; margin-top: 4px; }
+  button { background: #2563eb; color: #fff; border: none; border-radius: 6px; padding: 12px 24px; font-size: 15px; cursor: pointer; }
+  button:hover { background: #1d4ed8; }
+  .actions { display: flex; gap: 12px; align-items: center; }
+</style>
+</head>
+<body>
+  <h1>Bulk Mail</h1>
+  <p class="subtitle">Envie um e-mail (texto + imagens) para uma lista de destinatarios usando seu proprio SMTP.</p>
+
+  <form action="/send" method="post" enctype="multipart/form-data">
+    <fieldset>
+      <legend>Servidor SMTP</legend>
+      <div class="row">
+        <div>
+          <label>Servidor</label>
+          <input type="text" name="smtp_host" value="smtp.office365.com" required />
+        </div>
+        <div style="flex:0 0 100px;">
+          <label>Porta</label>
+          <input type="number" name="smtp_port" value="587" required />
+        </div>
+      </div>
+      <div class="check-row">
+        <input type="checkbox" id="smtp_use_ssl" name="smtp_use_ssl" />
+        <label for="smtp_use_ssl">Usar SSL direto (deixe desmarcado para STARTTLS na porta 587, ex: UFPR/Office365)</label>
+      </div>
+      <label>Seu e-mail (usuario)</label>
+      <input type="email" name="smtp_user" placeholder="seunome@ufpr.br" required />
+      <label>Sua senha</label>
+      <input type="password" name="smtp_password" required />
+      <p class="hint">A senha e usada apenas para esta requisicao e nunca e gravada em disco.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Remetente</legend>
+      <div class="row">
+        <div>
+          <label>Nome exibido</label>
+          <input type="text" name="from_name" placeholder="Seu Nome" />
+        </div>
+        <div>
+          <label>E-mail do remetente</label>
+          <input type="email" name="from_email" placeholder="(igual ao usuario SMTP se vazio)" />
+        </div>
+      </div>
+      <label>Responder para (opcional)</label>
+      <input type="email" name="reply_to" />
+    </fieldset>
+
+    <fieldset>
+      <legend>Mensagem</legend>
+      <label>Assunto (aceita {{name}}, {{company}}, etc.)</label>
+      <input type="text" name="subject" placeholder="Ola {{name}}" required />
+      <label>Texto (separe paragrafos com uma linha em branco)</label>
+      <textarea name="message" rows="8" placeholder="Ola {{name}},&#10;&#10;Escreva sua mensagem aqui..." required></textarea>
+      <label>Imagens (opcional, inseridas apos o texto, na ordem escolhida)</label>
+      <input type="file" name="images" accept="image/*" multiple />
+    </fieldset>
+
+    <fieldset>
+      <legend>Destinatarios</legend>
+      <label>Arquivo CSV (coluna obrigatoria: email; outras colunas viram campos {{coluna}})</label>
+      <input type="file" name="recipients_file" accept=".csv" />
+      <p class="hint">ou cole o conteudo CSV abaixo (tem prioridade o arquivo, se ambos forem enviados)</p>
+      <textarea name="recipients_text" rows="4" placeholder="email,name,company&#10;alice@example.com,Alice,Acme"></textarea>
+      <label>Enviar apenas um teste para (opcional, ignora a lista acima)</label>
+      <input type="email" name="test_email" placeholder="seunome@ufpr.br" />
+    </fieldset>
+
+    <fieldset>
+      <legend>Envio</legend>
+      <div class="row">
+        <div>
+          <label>Intervalo entre envios (segundos)</label>
+          <input type="number" name="delay" value="2" min="0" step="0.5" />
+        </div>
+      </div>
+      <div class="check-row">
+        <input type="checkbox" id="dry_run" name="dry_run" checked />
+        <label for="dry_run">Modo teste (dry-run): nao envia nada, apenas simula</label>
+      </div>
+    </fieldset>
+
+    <div class="actions">
+      <button type="submit">Enviar</button>
+      <span class="hint">Dica: rode primeiro com "Modo teste" marcado e/ou preenchendo "Enviar apenas um teste para".</span>
+    </div>
+  </form>
+</body>
+</html>

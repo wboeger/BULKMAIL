@@ -4,7 +4,26 @@ Send a personalized text + image HTML email to a list of recipients using
 your own professional mailbox over SMTP. No external services involved —
 your credentials only ever go to your mail provider's SMTP server.
 
-## Setup
+## Web UI (simplest way to use it)
+
+A local browser form is included so you don't need the command line at all:
+
+```bash
+pip install -r requirements.txt
+python3 webapp/app.py
+```
+
+Then open **http://127.0.0.1:5000**. Fill in your SMTP login, subject,
+message text, upload images, and paste/upload your recipients CSV. It only
+listens on localhost (not exposed to the internet), and your password is
+used only for that one request — it's never written to disk. Always leave
+"Modo teste (dry-run)" checked for your first try, then use "Enviar apenas
+um teste para" to send yourself one real message before sending to everyone.
+
+The rest of this README covers the command-line version, which offers more
+control (editable HTML template, resume, per-run caps, etc.).
+
+## Setup (command line)
 
 1. Install dependencies:
    ```

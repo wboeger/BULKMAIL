@@ -4,3 +4,4 @@ __pycache__/
 sent_log.csv
 .venv/
 venv/
+webapp/_uploads/

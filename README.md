@@ -16,11 +16,16 @@ your credentials only ever go to your mail provider's SMTP server.
    cp .env.example .env
    ```
    Edit `.env` and set `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, etc.
+   - **UFPR institutional email (Microsoft 365)**: host `smtp.office365.com`,
+     port `587`, STARTTLS (`SMTP_USE_SSL=false`), username = your full
+     `@ufpr.br` address, password = your normal mailbox password. This is
+     the default already set in `.env.example`.
    - **Gmail / Google Workspace**: host `smtp.gmail.com`, port `587`. If
      2‑Step Verification is on (recommended), generate an
      [App Password](https://myaccount.google.com/apppasswords) — your normal
      login password won't work.
-   - **Microsoft 365 / Outlook**: host `smtp.office365.com`, port `587`.
+   - **Other Microsoft 365 / Outlook accounts**: same as UFPR above, host
+     `smtp.office365.com`, port `587`.
    - Other providers: check their SMTP docs for host/port.
 
    `.env` is git-ignored and never committed.

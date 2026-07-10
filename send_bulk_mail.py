@@ -67,14 +67,34 @@ def load_recipients(path):
     return rows
 
 
+def sanitize_cid(name, used):
+    """Turn an arbitrary filename stem into a safe, unique Content-ID token.
+
+    Content-ID values must not contain spaces or most punctuation (mail
+    filenames like "Screenshot 2024-07-10 at 10.23.45.png" would otherwise
+    produce an invalid cid that clients like Outlook can't match against
+    the <img src="cid:..."> reference, causing the image to show up as a
+    plain attachment instead of rendering inline).
+    """
+    slug = re.sub(r"[^A-Za-z0-9_-]+", "_", name).strip("_") or "img"
+    cid = slug
+    n = 2
+    while cid in used:
+        cid = f"{slug}_{n}"
+        n += 1
+    used.add(cid)
+    return cid
+
+
 def load_images(images_dir):
     """Return {cid_name: Path} for every image file in images_dir."""
     images = {}
+    used_cids = set()
     if not images_dir.is_dir():
         return images
     for p in sorted(images_dir.iterdir()):
         if p.is_file() and (mimetypes.guess_type(p.name)[0] or "").startswith("image/"):
-            images[p.stem] = p
+            images[sanitize_cid(p.stem, used_cids)] = p
     return images
 
 

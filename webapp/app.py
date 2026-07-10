@@ -27,7 +27,7 @@ from flask import Flask, render_template, request
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from send_bulk_mail import build_message, render  # noqa: E402
+from send_bulk_mail import build_message, render, sanitize_cid  # noqa: E402
 
 UPLOAD_DIR = ROOT / "webapp" / "_uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -127,13 +127,13 @@ def send():
     run_dir = UPLOAD_DIR / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%f")
     run_dir.mkdir(parents=True, exist_ok=True)
     images = {}
+    used_cids = set()
     try:
         for file in request.files.getlist("images"):
             if file and file.filename:
-                stem = Path(file.filename).stem
                 dest = run_dir / file.filename
                 file.save(dest)
-                images[stem] = dest
+                images[sanitize_cid(Path(file.filename).stem, used_cids)] = dest
 
         subject_template = f["subject"]
         message_text = f["message"]

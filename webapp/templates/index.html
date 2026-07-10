@@ -85,8 +85,8 @@
       <legend>Destinatarios</legend>
       <label>Arquivo CSV (coluna obrigatoria: email; outras colunas viram campos {{coluna}})</label>
       <input type="file" name="recipients_file" accept=".csv" />
-      <p class="hint">ou cole o conteudo CSV abaixo (tem prioridade o arquivo, se ambos forem enviados)</p>
-      <textarea name="recipients_text" rows="4" placeholder="email,name,company&#10;alice@example.com,Alice,Acme"></textarea>
+      <p class="hint">ou cole abaixo: um e-mail por linha (com ou sem nome), ou um CSV com cabecalho. O arquivo tem prioridade se ambos forem preenchidos.</p>
+      <textarea name="recipients_text" rows="4" placeholder="alice@example.com&#10;bob@example.com, Bob"></textarea>
       <label>Enviar apenas um teste para (opcional, ignora a lista acima)</label>
       <input type="email" name="test_email" placeholder="seunome@ufpr.br" />
     </fieldset>

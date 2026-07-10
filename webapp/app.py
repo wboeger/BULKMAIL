@@ -71,8 +71,28 @@ def parse_recipients(file_storage, text_blob):
         content = text_blob
     if not content:
         return []
-    reader = csv.DictReader(io.StringIO(content))
-    return [row for row in reader if row.get("email")]
+
+    lines = [line for line in content.splitlines() if line.strip()]
+    if not lines:
+        return []
+    first_cell = lines[0].split(",")[0].strip().strip('"').lower()
+
+    if first_cell == "email":
+        reader = csv.DictReader(io.StringIO(content))
+        return [row for row in reader if row.get("email", "").strip()]
+
+    # No "email" header: treat every line as one recipient, "email" or
+    # "email,name,..." -- handles a plain list of addresses typed by hand.
+    rows = []
+    for parts in csv.reader(io.StringIO(content)):
+        parts = [p.strip() for p in parts if p.strip()]
+        if not parts or "@" not in parts[0]:
+            continue
+        row = {"email": parts[0]}
+        if len(parts) > 1:
+            row["name"] = parts[1]
+        rows.append(row)
+    return rows
 
 
 def compose_html(message_text, image_names, from_name, from_email):

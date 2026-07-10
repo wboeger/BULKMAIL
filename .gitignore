@@ -1,0 +1,6 @@
+.env
+__pycache__/
+*.pyc
+sent_log.csv
+.venv/
+venv/

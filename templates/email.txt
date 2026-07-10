@@ -1,0 +1,10 @@
+Hi {{name}},
+
+This is a sample bulk email. Replace this paragraph with your own message.
+You can use merge fields like {{name}} or {{company}} -- any column from
+your recipients CSV can be used as a placeholder here.
+
+(This is the plain-text version, shown to clients that don't render HTML.)
+
+--
+Sent by {{from_name}} <{{from_email}}>

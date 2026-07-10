@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+  <body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;padding:24px 0;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;">
+            <tr>
+              <td style="padding:24px;text-align:center;">
+                <!-- Inline image: put a file named logo.png|jpg|jpeg|gif|png in the images/ folder
+                     and reference it here as cid:logo (filename without extension) -->
+                <img src="cid:logo" alt="Logo" width="160" style="display:block;margin:0 auto;" />
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 8px 32px;">
+                <h1 style="color:#222222;font-size:22px;margin:0 0 16px 0;">Hi {{name}},</h1>
+                <p style="color:#444444;font-size:15px;line-height:1.6;margin:0 0 16px 0;">
+                  This is a sample bulk email. Replace this paragraph with your own message.
+                  You can use merge fields like {{name}} or {{company}} — any column from your
+                  recipients CSV can be used as a placeholder here.
+                </p>
+                <p style="color:#444444;font-size:15px;line-height:1.6;margin:0 0 16px 0;">
+                  Images are embedded directly in the email (not linked externally), so they
+                  render reliably even when recipients block remote images.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 24px 32px;text-align:center;">
+                <!-- Add a second image, e.g. images/banner.png -> cid:banner -->
+                <img src="cid:banner" alt="Banner" width="536" style="display:block;margin:0 auto;border-radius:6px;" />
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 32px 32px;text-align:center;">
+                <a href="https://example.com"
+                   style="background-color:#2563eb;color:#ffffff;text-decoration:none;
+                          padding:12px 28px;border-radius:6px;font-size:15px;display:inline-block;">
+                  Call to action
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 32px;background-color:#fafafa;text-align:center;">
+                <p style="color:#999999;font-size:12px;margin:0;">
+                  Sent by {{from_name}} &middot; {{from_email}}
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

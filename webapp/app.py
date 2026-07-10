@@ -52,10 +52,21 @@ def friendly_smtp_error(exc):
 app = Flask(__name__)
 
 
+def decode_upload(raw_bytes):
+    # CSVs exported from Excel on Windows are commonly Latin-1/cp1252, not UTF-8
+    # (very common with accented Portuguese names), so try a few encodings.
+    for enc in ("utf-8-sig", "utf-8", "cp1252", "latin-1"):
+        try:
+            return raw_bytes.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return raw_bytes.decode("utf-8", errors="replace")
+
+
 def parse_recipients(file_storage, text_blob):
     content = None
     if file_storage and file_storage.filename:
-        content = file_storage.read().decode("utf-8")
+        content = decode_upload(file_storage.read())
     elif text_blob and text_blob.strip():
         content = text_blob
     if not content:
@@ -99,6 +110,13 @@ def index():
 
 @app.route("/send", methods=["POST"])
 def send():
+    try:
+        return _send()
+    except Exception as exc:
+        return render_template("result.html", error=f"Erro inesperado: {friendly_smtp_error(exc)}", results=[])
+
+
+def _send():
     f = request.form
     try:
         cfg = {

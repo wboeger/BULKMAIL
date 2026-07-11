@@ -154,6 +154,21 @@ def _send():
         return render_template("result.html", error=f"Configuracao invalida: {exc}", results=[])
 
     dry_run = f.get("dry_run") == "on"
+    if not dry_run:
+        missing = [
+            label for label, val in [
+                ("Servidor SMTP", cfg["host"]),
+                ("Seu e-mail (usuario)", cfg["user"]),
+                ("Sua senha", cfg["password"]),
+            ] if not val
+        ]
+        if missing:
+            return render_template(
+                "result.html",
+                error=f"Preencha os campos obrigatorios: {', '.join(missing)}.",
+                results=[],
+            )
+
     test_email = f.get("test_email", "").strip()
 
     recipients = parse_recipients(request.files.get("recipients_file"), f.get("recipients_text"))

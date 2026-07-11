@@ -16,6 +16,7 @@ PORT environment variable if 5001 is also busy, e.g. PORT=8000 python3 webapp/ap
 import csv
 import io
 import os
+import re
 import shutil
 import smtplib
 import sys
@@ -31,6 +32,18 @@ from send_bulk_mail import build_message, render, sanitize_cid  # noqa: E402
 
 UPLOAD_DIR = ROOT / "webapp" / "_uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+EMAIL_RE = re.compile(r"^[^@\s;,]+@[^@\s;,]+\.[^@\s;,]+$")
+
+
+def connect_smtp(cfg):
+    if cfg["use_ssl"]:
+        smtp = smtplib.SMTP_SSL(cfg["host"], cfg["port"], timeout=30)
+    else:
+        smtp = smtplib.SMTP(cfg["host"], cfg["port"], timeout=30)
+        smtp.starttls()
+    smtp.login(cfg["user"], cfg["password"])
+    return smtp
 
 
 def friendly_smtp_error(exc):
@@ -78,20 +91,32 @@ def parse_recipients(file_storage, text_blob):
     first_cell = lines[0].split(",")[0].strip().strip('"').lower()
 
     if first_cell == "email":
-        reader = csv.DictReader(io.StringIO(content))
-        return [row for row in reader if row.get("email", "").strip()]
+        rows = []
+        for row in csv.DictReader(io.StringIO(content)):
+            email = row.get("email", "").strip().strip(";").strip()
+            if not email:
+                continue
+            row["email"] = email
+            rows.append(row)
+        return rows
 
-    # No "email" header: treat every line as one recipient, "email" or
-    # "email,name,..." -- handles a plain list of addresses typed by hand.
+    # No "email" header: treat every line as one or more recipients. Handles
+    # a plain list typed/pasted by hand, including Outlook-style lists where
+    # multiple addresses on one line are separated by ";" (e.g. copy-pasted
+    # from an Outlook "To:" field), with an optional ",Name" per address.
     rows = []
-    for parts in csv.reader(io.StringIO(content)):
-        parts = [p.strip() for p in parts if p.strip()]
-        if not parts or "@" not in parts[0]:
-            continue
-        row = {"email": parts[0]}
-        if len(parts) > 1:
-            row["name"] = parts[1]
-        rows.append(row)
+    for line in lines:
+        for chunk in line.split(";"):
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+            parts = [p.strip() for p in next(csv.reader([chunk])) if p.strip()]
+            if not parts or "@" not in parts[0]:
+                continue
+            row = {"email": parts[0]}
+            if len(parts) > 1:
+                row["name"] = parts[1]
+            rows.append(row)
     return rows
 
 
@@ -195,12 +220,7 @@ def _send():
 
         if not dry_run:
             try:
-                if cfg["use_ssl"]:
-                    smtp = smtplib.SMTP_SSL(cfg["host"], cfg["port"], timeout=30)
-                else:
-                    smtp = smtplib.SMTP(cfg["host"], cfg["port"], timeout=30)
-                    smtp.starttls()
-                smtp.login(cfg["user"], cfg["password"])
+                smtp = connect_smtp(cfg)
             except Exception as exc:
                 return render_template("result.html", error=f"Falha ao conectar/autenticar no SMTP: {friendly_smtp_error(exc)}", results=[])
 
@@ -214,9 +234,22 @@ def _send():
                 try:
                     if dry_run:
                         results.append({"email": email, "status": "dry-run", "error": ""})
+                    elif not EMAIL_RE.match(email):
+                        results.append({
+                            "email": email,
+                            "status": "falhou",
+                            "error": "Endereco invalido (confira se nao sobrou ';' ou espaco no fim).",
+                        })
                     else:
                         msg = build_message(cfg, subject, text_body, html_body, images, email)
-                        smtp.send_message(msg)
+                        try:
+                            smtp.send_message(msg)
+                        except (smtplib.SMTPServerDisconnected, smtplib.SMTPResponseException):
+                            # Office 365/Exchange can drop the connection after
+                            # a bad address or too many protocol errors; reconnect
+                            # once so the rest of the list isn't lost.
+                            smtp = connect_smtp(cfg)
+                            smtp.send_message(msg)
                         results.append({"email": email, "status": "enviado", "error": ""})
                         if cfg["delay"] > 0 and i < len(recipients) - 1:
                             time.sleep(cfg["delay"])

@@ -224,7 +224,10 @@ def _send():
                     results.append({"email": email, "status": "falhou", "error": friendly_smtp_error(exc)})
         finally:
             if smtp is not None:
-                smtp.quit()
+                try:
+                    smtp.quit()
+                except Exception:
+                    pass  # connection may already be closed by the server; results are what matter
     finally:
         shutil.rmtree(run_dir, ignore_errors=True)
 

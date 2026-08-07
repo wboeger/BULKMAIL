@@ -36,22 +36,41 @@
       <div class="row">
         <div>
           <label>Servidor</label>
-          <input type="text" name="smtp_host" value="smtp.office365.com" required />
+          <input type="text" name="smtp_host" value="{{ defaults.host }}" required />
         </div>
         <div style="flex:0 0 100px;">
           <label>Porta</label>
-          <input type="number" name="smtp_port" value="587" required />
+          <input type="number" name="smtp_port" value="{{ defaults.port }}" required />
         </div>
       </div>
       <div class="check-row">
-        <input type="checkbox" id="smtp_use_ssl" name="smtp_use_ssl" />
+        <input type="checkbox" id="smtp_use_ssl" name="smtp_use_ssl" {% if defaults.use_ssl %}checked{% endif %} />
         <label for="smtp_use_ssl">Usar SSL direto (deixe desmarcado para STARTTLS na porta 587, ex: UFPR/Office365)</label>
       </div>
       <label>Seu e-mail (usuario)</label>
-      <input type="email" name="smtp_user" placeholder="seunome@ufpr.br" required />
-      <label>Sua senha</label>
-      <input type="password" name="smtp_password" required />
-      <p class="hint">A senha e usada apenas para esta requisicao e nunca e gravada em disco.</p>
+      <input type="email" name="smtp_user" value="{{ defaults.user }}" placeholder="seunome@gmail.com" required />
+
+      <label>Metodo de login</label>
+      <div class="check-row">
+        <input type="radio" id="auth_password" name="smtp_auth_method" value="password" {% if defaults.auth_method != "oauth2" %}checked{% endif %} />
+        <label for="auth_password">Senha</label>
+        <input type="radio" id="auth_oauth2" name="smtp_auth_method" value="oauth2" style="width:auto;" {% if defaults.auth_method == "oauth2" %}checked{% endif %} />
+        <label for="auth_oauth2">OAuth2 (Microsoft 365)</label>
+      </div>
+
+      <div id="password-field">
+        <label>Sua senha{% if defaults.has_env_password %} (opcional){% endif %}</label>
+        <input type="password" id="smtp_password" name="smtp_password" {% if not defaults.has_env_password %}required{% endif %} />
+        {% if defaults.has_env_password %}
+        <p class="hint">Deixe em branco para usar a senha do <code>.env</code> no servidor. No Gmail e preciso uma "Senha de app" (2 etapas ativada); a senha normal da conta e recusada.</p>
+        {% else %}
+        <p class="hint">A senha e usada apenas para esta requisicao e nunca e gravada em disco.</p>
+        {% endif %}
+      </div>
+      <p class="hint" id="oauth2-hint" style="display:none;">
+        Requer ter rodado <code>python3 oauth_setup.py</code> uma vez nesta maquina para esta conta
+        (veja README.md). Nao e preciso digitar senha.
+      </p>
     </fieldset>
 
     <fieldset>
@@ -59,16 +78,16 @@
       <div class="row">
         <div>
           <label>Nome exibido</label>
-          <input type="text" name="from_name" placeholder="Seu Nome" />
+          <input type="text" name="from_name" value="{{ defaults.from_name }}" placeholder="Seu Nome" />
         </div>
         <div>
           <label>E-mail do remetente</label>
-          <input type="email" name="from_email" placeholder="(igual ao usuario SMTP se vazio)" />
+          <input type="email" name="from_email" value="{{ defaults.from_email }}" placeholder="(igual ao usuario SMTP se vazio)" />
           <p class="hint">Deixe em branco na duvida. Servidores como Office 365/UFPR bloqueiam o envio se este campo for diferente do usuario que fez login acima.</p>
         </div>
       </div>
       <label>Responder para (opcional)</label>
-      <input type="email" name="reply_to" />
+      <input type="email" name="reply_to" value="{{ defaults.reply_to }}" />
     </fieldset>
 
     <fieldset>
@@ -96,7 +115,16 @@
       <div class="row">
         <div>
           <label>Intervalo entre envios (segundos)</label>
-          <input type="number" name="delay" value="2" min="0" step="0.5" />
+          <input type="number" name="delay" value="{{ defaults.delay }}" min="0" step="0.5" />
+        </div>
+        <div>
+          <label>Mensagens por lote</label>
+          <input type="number" name="chunk_size" value="0" min="0" step="1" />
+          <p class="hint">0 = sem lotes (um unico envio continuo)</p>
+        </div>
+        <div>
+          <label>Pausa entre lotes (segundos)</label>
+          <input type="number" name="chunk_pause" value="0" min="0" step="1" />
         </div>
       </div>
       <div class="check-row">
@@ -110,5 +138,17 @@
       <span class="hint">Dica: rode primeiro com "Modo teste" marcado e/ou preenchendo "Enviar apenas um teste para".</span>
     </div>
   </form>
+
+<script>
+function updateAuthMethod() {
+  const oauth2 = document.querySelector('input[name="smtp_auth_method"]:checked').value === "oauth2";
+  document.getElementById("password-field").style.display = oauth2 ? "none" : "block";
+  document.getElementById("oauth2-hint").style.display = oauth2 ? "block" : "none";
+  // With SMTP_PASSWORD in .env the field is an override, so never force it.
+  document.getElementById("smtp_password").required = !oauth2 && {{ 'false' if defaults.has_env_password else 'true' }};
+}
+document.querySelectorAll('input[name="smtp_auth_method"]').forEach(el => el.addEventListener("change", updateAuthMethod));
+updateAuthMethod();
+</script>
 </body>
 </html>

@@ -1,7 +1,15 @@
 .env
+.oauth_cache.json
 __pycache__/
 *.pyc
 sent_log.csv
 .venv/
 venv/
 webapp/_uploads/
+.DS_Store
+recipients*.csv
+!recipients.example.csv
+# Contact lists carry personal data of real researchers; never commit them.
+todos pesquisadores.csv
+suppressed.csv
+webapp/_runs/

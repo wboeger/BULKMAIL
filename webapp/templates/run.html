@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bulk Mail - Envio em andamento</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, Arial, sans-serif; max-width: 720px; margin: 32px auto; padding: 0 16px; line-height: 1.5; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .subject { color: #666; font-size: 14px; margin-bottom: 20px; }
+  .state { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+  .state-running { background: #dbeafe; color: #1e40af; }
+  .state-done { background: #dcfce7; color: #166534; }
+  .state-cancelled { background: #fef3c7; color: #92400e; }
+  .state-interrupted { background: #fef3c7; color: #92400e; }
+  .state-error { background: #fee2e2; color: #991b1b; }
+  .bar { background: #eee; border-radius: 999px; height: 12px; overflow: hidden; margin: 16px 0 8px; }
+  .bar > div { background: #2563eb; height: 100%; width: 0; transition: width .3s; }
+  .summary { color: #444; font-size: 14px; }
+  .notice { background: #fef9c3; border: 1px solid #fde047; color: #713f12; padding: 10px 14px; border-radius: 8px; margin: 12px 0; font-size: 14px; }
+  .error-box { background: #fee2e2; border: 1px solid #fca5a5; color: #7f1d1d; padding: 12px 16px; border-radius: 8px; margin-top: 16px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid #eee; font-size: 14px; }
+  .status-enviado { color: #16a34a; font-weight: 600; }
+  .status-falhou { color: #dc2626; font-weight: 600; }
+  .status-dry-run { color: #666; font-weight: 600; }
+  .actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 20px; }
+  button, .btn { background: #2563eb; color: #fff; border: none; border-radius: 6px; padding: 9px 18px; font-size: 14px; cursor: pointer; text-decoration: none; display: inline-block; }
+  button.secondary, .btn.secondary { background: #6b7280; }
+  input[type=password] { padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+  form.inline { display: flex; gap: 8px; align-items: center; margin: 0; }
+</style>
+</head>
+<body>
+  <h1>Envio {% if status.dry_run %}(modo teste){% endif %}</h1>
+  <p class="subject">Assunto: {{ status.subject }}</p>
+  <p class="subject">
+    Intervalo entre envios: {{ status.delay }}s
+    {% if status.chunk_size %} · Lote: {{ status.chunk_size }} mensagens · Pausa entre lotes: {{ status.chunk_pause }}s
+    {% else %} · Sem lotes (envio continuo)
+    {% endif %}
+  </p>
+
+  {% for n in status.notices or [] %}
+    <div class="notice">{{ n }}</div>
+  {% endfor %}
+
+  <p>
+    <span id="state" class="state state-{{ status.state }}">{{ status.state }}</span>
+  </p>
+  <div class="bar"><div id="bar"></div></div>
+  <p class="summary" id="summary"></p>
+
+  <div id="error" class="error-box" style="display:none;"></div>
+
+  <div class="actions">
+    <form class="inline" id="cancel-form" method="post" action="/run/{{ status.run_id }}/cancel">
+      <button type="submit" class="secondary">Cancelar envio</button>
+    </form>
+    <form class="inline" id="resume-form" method="post" action="/run/{{ status.run_id }}/resume" style="display:none;">
+      {% if not status.dry_run and status.auth_method != "oauth2" %}
+      <input type="password" name="smtp_password" placeholder="Senha SMTP" required />
+      {% endif %}
+      <button type="submit">Continuar de onde parou</button>
+    </form>
+    <a class="btn secondary" href="/run/{{ status.run_id }}/log.csv">Baixar log CSV</a>
+    <a class="btn secondary" href="/">Novo envio</a>
+  </div>
+
+  <table>
+    <thead><tr><th>E-mail</th><th>Status</th><th>Erro</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+<script>
+const RUN_ID = {{ status.run_id | tojson }};
+const STATE_LABELS = {
+  running: "enviando...",
+  done: "concluido",
+  cancelled: "cancelado",
+  interrupted: "interrompido (servidor reiniciou)",
+  error: "erro"
+};
+
+function render(s) {
+  const stateEl = document.getElementById("state");
+  stateEl.textContent = STATE_LABELS[s.state] || s.state;
+  stateEl.className = "state state-" + s.state;
+
+  const pct = s.total ? Math.round(100 * s.done / s.total) : 0;
+  document.getElementById("bar").style.width = pct + "%";
+  document.getElementById("summary").textContent =
+    `${s.done} de ${s.total} processados (${pct}%) · enviados: ${s.counts.enviado}` +
+    ` · falharam: ${s.counts.falhou} · simulados: ${s.counts["dry-run"]}` +
+    (s.remaining ? ` · restam: ${s.remaining}` : "");
+
+  const errEl = document.getElementById("error");
+  errEl.style.display = s.error ? "block" : "none";
+  errEl.textContent = s.error || "";
+
+  const running = s.state === "running";
+  document.getElementById("cancel-form").style.display = running ? "flex" : "none";
+  document.getElementById("resume-form").style.display =
+    (!running && s.remaining > 0) ? "flex" : "none";
+
+  const tbody = document.getElementById("rows");
+  tbody.replaceChildren();
+  for (const r of s.rows) {
+    const tr = document.createElement("tr");
+    const email = document.createElement("td");
+    email.textContent = r.email;
+    const status = document.createElement("td");
+    status.textContent = r.status;
+    status.className = "status-" + r.status;
+    const error = document.createElement("td");
+    error.textContent = r.error || "";
+    tr.append(email, status, error);
+    tbody.append(tr);
+  }
+  return running;
+}
+
+async function poll() {
+  try {
+    const res = await fetch(`/run/${RUN_ID}/status`);
+    if (!res.ok) return;
+    if (render(await res.json())) setTimeout(poll, 1500);
+  } catch (e) {
+    setTimeout(poll, 5000);
+  }
+}
+
+render({{ status | tojson }});
+if ({{ status.state | tojson }} === "running") setTimeout(poll, 1000);
+</script>
+</body>
+</html>

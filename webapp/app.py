@@ -34,6 +34,7 @@ from send_bulk_mail import (  # noqa: E402
     classify_smtp_error,
     dedupe_recipients,
     filter_suppressed,
+    normalize_password,
     render,
     sanitize_cid,
 )
@@ -231,7 +232,9 @@ def _send():
             "port": int(f["smtp_port"]),
             "use_ssl": f.get("smtp_use_ssl") == "on",
             "user": f["smtp_user"].strip(),
-            "password": f.get("smtp_password", "") or os.getenv("SMTP_PASSWORD", ""),
+            "password": normalize_password(
+                f.get("smtp_password", "") or os.getenv("SMTP_PASSWORD", "")
+            ),
             "auth_method": f.get("smtp_auth_method", "password"),
             "oauth_client_id": os.getenv("MS_OAUTH_CLIENT_ID", ""),
             "oauth_tenant_id": os.getenv("MS_OAUTH_TENANT_ID", "organizations"),
@@ -418,7 +421,9 @@ def run_resume(run_id):
     if current["state"] == "running":
         return redirect(url_for("run_page", run_id=run_id))
 
-    password = request.form.get("smtp_password", "")
+    password = normalize_password(
+        request.form.get("smtp_password", "") or os.getenv("SMTP_PASSWORD", "")
+    )
     campaign = jobs.read_campaign(run_dir)
     needs_password = campaign["cfg"].get("auth_method") != "oauth2"
     if not campaign.get("dry_run") and needs_password and not password:

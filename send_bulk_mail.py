@@ -46,6 +46,18 @@ def sanitize_header(value):
     return " ".join(str(value).replace("\r", "\n").split("\n")).strip()
 
 
+def normalize_password(value):
+    """Strip every whitespace character out of an SMTP password.
+
+    Gmail displays App Passwords as "abcd efgh ijkl mnop" and the copy button
+    hands over U+00A0 (non-breaking space), not a plain space. smtplib encodes
+    credentials as ASCII, so a pasted password blows up with
+    "'ascii' codec can't encode character '\\xa0'" long before authentication.
+    Providers ignore the separators anyway, so drop all whitespace.
+    """
+    return "".join(str(value or "").split())
+
+
 EMAIL_RE = re.compile(r"^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$")
 
 
@@ -156,7 +168,7 @@ def load_config():
         "port": int(os.environ["SMTP_PORT"]),
         "use_ssl": os.getenv("SMTP_USE_SSL", "false").lower() == "true",
         "user": os.environ["SMTP_USER"],
-        "password": os.getenv("SMTP_PASSWORD", ""),
+        "password": normalize_password(os.getenv("SMTP_PASSWORD", "")),
         "auth_method": auth_method,
         "oauth_client_id": os.getenv("MS_OAUTH_CLIENT_ID", ""),
         "oauth_tenant_id": os.getenv("MS_OAUTH_TENANT_ID", "organizations"),

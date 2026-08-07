@@ -107,7 +107,14 @@
       <p class="hint">ou cole abaixo: um e-mail por linha (com ou sem nome), ou um CSV com cabecalho. O arquivo tem prioridade se ambos forem preenchidos.</p>
       <textarea name="recipients_text" rows="4" placeholder="alice@example.com&#10;bob@example.com, Bob"></textarea>
       <label>Enviar apenas um teste para (opcional, ignora a lista acima)</label>
-      <input type="email" name="test_email" placeholder="seunome@ufpr.br" />
+      <input type="email" id="test_email" name="test_email" placeholder="{{ defaults.user }}" />
+      <p class="hint">
+        Para medir a chance de cair em spam: abra
+        <a href="https://www.mail-tester.com" target="_blank" rel="noopener">mail-tester.com</a>,
+        copie o endereco <code>algo@srv1.mail-tester.com</code> que ele mostra, cole no campo acima
+        e clique em "Enviar teste real". Depois volte ao mail-tester para ver a nota (0 a 10).
+      </p>
+      <p class="hint" id="mailtester-link" style="display:none;"></p>
     </fieldset>
 
     <fieldset>
@@ -135,7 +142,14 @@
 
     <div class="actions">
       <button type="submit">Enviar</button>
-      <span class="hint">Dica: rode primeiro com "Modo teste" marcado e/ou preenchendo "Enviar apenas um teste para".</span>
+      <button type="button" id="btn-test-self">Enviar teste para mim</button>
+      <button type="button" id="btn-test-real">Enviar teste real</button>
+      <span class="hint">
+        "Enviar teste para mim" manda uma copia unica para {{ defaults.user }}.
+        "Enviar teste real" manda uma copia unica para o endereco em "Enviar apenas um teste para".
+        Ambos ignoram a lista e desligam o modo teste, porque so um envio de verdade mostra
+        como o e-mail chega na caixa de entrada.
+      </span>
     </div>
   </form>
 
@@ -149,6 +163,44 @@ function updateAuthMethod() {
 }
 document.querySelectorAll('input[name="smtp_auth_method"]').forEach(el => el.addEventListener("change", updateAuthMethod));
 updateAuthMethod();
+
+// Both test buttons send exactly one real message: a dry-run never leaves the
+// machine, so it cannot show whether a provider files the mail as spam.
+function sendSingleTest(address) {
+  const field = document.getElementById("test_email");
+  if (address) field.value = address;
+  if (!field.value.trim()) {
+    field.focus();
+    alert("Informe o endereco de teste (ou use mail-tester.com para obter um).");
+    return;
+  }
+  document.getElementById("dry_run").checked = false;
+  // requestSubmit keeps the browser's required-field validation; form.submit()
+  // would skip it and post an empty subject straight to the server.
+  field.form.requestSubmit();
+}
+
+document.getElementById("btn-test-self").addEventListener("click", function () {
+  sendSingleTest({{ defaults.user | tojson }});
+});
+document.getElementById("btn-test-real").addEventListener("click", function () {
+  sendSingleTest(null);
+});
+
+// A mail-tester address maps 1:1 to its result page, so surface the link as
+// soon as one is typed -- the score only appears after the message arrives.
+document.getElementById("test_email").addEventListener("input", function () {
+  const box = document.getElementById("mailtester-link");
+  const m = this.value.trim().match(/^([\w.+-]+)@[\w.-]*mail-tester\.com$/i);
+  if (m) {
+    const url = "https://www.mail-tester.com/" + encodeURIComponent(m[1]);
+    box.innerHTML = 'Depois de enviar, veja a nota em <a href="' + url +
+      '" target="_blank" rel="noopener">' + url + "</a>";
+    box.style.display = "block";
+  } else {
+    box.style.display = "none";
+  }
+});
 </script>
 </body>
 </html>

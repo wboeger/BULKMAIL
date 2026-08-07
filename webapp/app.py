@@ -295,6 +295,28 @@ def _send():
             results=[],
         )
 
+    max_per_day = int(os.environ.get("MAX_PER_DAY", 0))
+    if max_per_day > 0 and not dry_run:
+        # Warn before the run starts instead of only stopping mid-list: the
+        # operator can then split the campaign deliberately rather than
+        # discover the cut halfway through.
+        used = jobs.sent_last_24h(RUNS_DIR)
+        left = max_per_day - used
+        if left <= 0:
+            return render_template(
+                "result.html",
+                error=(
+                    f"Limite diario atingido: {used} de {max_per_day} envios nas ultimas 24h. "
+                    "Aguarde a janela de 24h virar antes de enviar mais."
+                ),
+                results=[],
+            )
+        if len(recipients) > left:
+            notices.append(
+                f"Limite diario: {used} de {max_per_day} envios ja usados nas ultimas 24h. "
+                f"Este envio para na {left}a mensagem; use \"Continuar envio\" depois."
+            )
+
     # The password stays in memory for this worker only: campaign.json is
     # written to disk, so it must never carry credentials.
     password = cfg.pop("password")
@@ -310,6 +332,7 @@ def _send():
         "chunk_pause": chunk_pause,
         "throttle_backoff": float(os.environ.get("THROTTLE_BACKOFF_SECONDS", 300)),
         "max_throttle_retries": int(os.environ.get("MAX_THROTTLE_RETRIES", 2)),
+        "max_per_day": max_per_day,
         "dry_run": dry_run,
         "recipients": recipients,
         "images": {},

@@ -90,6 +90,31 @@ def sent_addresses(run_dir):
     }
 
 
+def sent_last_24h(runs_dir):
+    """Messages actually sent in the last 24 hours, across every run.
+
+    Provider quotas (Gmail's ~500/day) are enforced on a rolling window, not
+    on calendar days, so this counts backwards from now instead of since
+    midnight. Only 'enviado' rows count: a dry-run never reaches the provider.
+    Runs deleted by cleanup_old_runs fall out of the count, which is safe --
+    the retention window is days, the quota window is 24 hours.
+    """
+    cutoff = _now() - timedelta(hours=24)
+    total = 0
+    for path in runs_dir.glob("*/log.csv"):
+        with open(path, newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                if row.get("status") != "enviado":
+                    continue
+                try:
+                    ts = datetime.fromisoformat(row["timestamp"])
+                except (KeyError, ValueError):
+                    continue  # hand-edited or truncated log line
+                if ts >= cutoff:
+                    total += 1
+    return total
+
+
 def get_job(run_id):
     with _jobs_lock:
         return _jobs.get(run_id)
@@ -182,6 +207,11 @@ def _run(job, run_dir, campaign, password, send_one, connect, friendly_error,
     throttle_backoff = float(campaign.get("throttle_backoff") or 300)
     max_throttle_retries = int(campaign.get("max_throttle_retries") or 2)
     dry_run = campaign.get("dry_run", False)
+    max_per_day = int(campaign.get("max_per_day") or 0)
+    # Counted once: re-scanning every run's log per recipient would be O(list^2)
+    # file reads. The window slides during a long run, so this only ever
+    # over-counts, which is the safe direction for a quota.
+    quota_used = sent_last_24h(run_dir.parent) if max_per_day > 0 and not dry_run else 0
 
     smtp = None
     try:
@@ -197,6 +227,17 @@ def _run(job, run_dir, campaign, password, send_one, connect, friendly_error,
             if job.cancel.is_set():
                 job.state = "cancelled"
                 return
+            if max_per_day > 0 and quota_used >= max_per_day:
+                # Stop before the provider does: blowing past the quota gets the
+                # account throttled or suspended, and the rest of the list is
+                # recoverable with /run/<id>/resume once the window rolls over.
+                job.state = "daily_limit"
+                job.error = (
+                    f"Limite diario de {max_per_day} envios atingido nas ultimas 24h. "
+                    "Os destinatarios restantes ficaram pendentes: use \"Continuar envio\" "
+                    "amanha para retomar de onde parou."
+                )
+                return
             email = row["email"].strip()
             throttle_attempt = 0
             while True:
@@ -206,6 +247,7 @@ def _run(job, run_dir, campaign, password, send_one, connect, friendly_error,
                     else:
                         send_one(campaign, row, images, smtp)
                         _append_log(run_dir, email, "enviado", "")
+                        quota_used += 1
                     break
                 except (smtplib.SMTPServerDisconnected, smtplib.SMTPConnectError) as exc:
                     # The connection dropped mid-list; reconnect once so the rest of

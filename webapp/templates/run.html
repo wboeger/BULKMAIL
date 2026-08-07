@@ -13,6 +13,7 @@
   .state-done { background: #dcfce7; color: #166534; }
   .state-cancelled { background: #fef3c7; color: #92400e; }
   .state-interrupted { background: #fef3c7; color: #92400e; }
+  .state-daily_limit { background: #fef3c7; color: #92400e; }
   .state-error { background: #fee2e2; color: #991b1b; }
   .bar { background: #eee; border-radius: 999px; height: 12px; overflow: hidden; margin: 16px 0 8px; }
   .bar > div { background: #2563eb; height: 100%; width: 0; transition: width .3s; }
@@ -79,6 +80,7 @@ const STATE_LABELS = {
   done: "concluido",
   cancelled: "cancelado",
   interrupted: "interrompido (servidor reiniciou)",
+  daily_limit: "pausado: limite diario atingido",
   error: "erro"
 };
 

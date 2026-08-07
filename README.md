@@ -150,6 +150,7 @@ python send_bulk_mail.py --recipients recipients.csv --subject "Hello {{name}}"
 
 Useful flags:
 - `--max-per-run N` — cap how many emails go out in one run (also settable via `MAX_PER_RUN` in `.env`).
+- `--max-per-day N` — cap how many emails go out in any rolling 24h window (also settable via `MAX_PER_DAY` in `.env`). Unlike `--max-per-run`, this is counted from `sent_log.csv`, so it holds across separate invocations. The web UI applies the same cap across all runs and pauses a run that reaches it; "Continuar envio" resumes once the window rolls over.
 - `--resume` — skip addresses already marked `sent` in `sent_log.csv`, so an interrupted run can be safely re-run.
 - `SEND_DELAY_SECONDS` in `.env` — pause between sends to stay under your provider's rate limits and reduce spam-flagging risk.
 

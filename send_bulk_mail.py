@@ -16,7 +16,7 @@ import re
 import smtplib
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -178,6 +178,7 @@ def load_config():
         "delay": float(os.getenv("SEND_DELAY_SECONDS", "2")),
         "max_per_run": int(os.getenv("MAX_PER_RUN", "0")),
         "throttle_backoff_seconds": float(os.getenv("THROTTLE_BACKOFF_SECONDS", "300")),
+        "max_per_day": int(os.getenv("MAX_PER_DAY", "0")),
         "max_throttle_retries": int(os.getenv("MAX_THROTTLE_RETRIES", "2")),
     }
 
@@ -249,6 +250,30 @@ def already_sent(log_path):
     return sent
 
 
+def sent_last_24h(log_path):
+    """Messages sent in the last 24 hours according to the log.
+
+    Provider quotas run on a rolling window rather than calendar days, so the
+    cutoff is measured back from now. Only 'sent' rows count -- a dry-run never
+    reaches the provider.
+    """
+    if not log_path.exists():
+        return 0
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    total = 0
+    with open(log_path, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            if row.get("status") != "sent":
+                continue
+            try:
+                ts = datetime.fromisoformat(row["timestamp"])
+            except (KeyError, ValueError):
+                continue  # hand-edited or truncated log line
+            if ts >= cutoff:
+                total += 1
+    return total
+
+
 def build_message(cfg, subject, text_body, html_body, images, to_email):
     # multipart/related > multipart/alternative(text, html) > inline images (siblings)
     # This ordering (related as the outermost container) is the structure Outlook /
@@ -318,6 +343,22 @@ def send_all(args):
         args.max_per_run = cfg["max_per_run"]
     if args.max_per_run and len(recipients) > args.max_per_run:
         recipients = recipients[: args.max_per_run]
+
+    # MAX_PER_RUN caps one invocation; MAX_PER_DAY caps the rolling 24h window
+    # the provider actually enforces, so it has to be read back off the log.
+    if args.max_per_day is None:
+        args.max_per_day = cfg["max_per_day"]
+    if args.max_per_day and not args.dry_run:
+        used = sent_last_24h(log_path)
+        left = args.max_per_day - used
+        if left <= 0:
+            print(f"Daily limit reached: {used}/{args.max_per_day} sent in the last 24h. "
+                  f"Wait for the window to roll over.", file=sys.stderr)
+            return 1
+        if len(recipients) > left:
+            print(f"Daily limit: {used}/{args.max_per_day} used in the last 24h, "
+                  f"sending only the next {left}. Re-run with --resume later.")
+            recipients = recipients[:left]
 
     print(f"Loaded {len(recipients)} recipient(s), {len(images)} inline image(s): "
           f"{', '.join(images) or '(none)'}")
@@ -417,8 +458,9 @@ def parse_args():
     p.add_argument("--dry-run", action="store_true", help="Render and print without sending anything")
     p.add_argument("--test-email", help="Send a single test message to this address instead of the full list")
     p.add_argument("--max-per-run", type=int, default=None, help="Cap number of emails sent this run (overrides MAX_PER_RUN in .env)")
+    p.add_argument("--max-per-day", type=int, default=None, help="Cap emails sent in the rolling last 24h, counted from the log (overrides MAX_PER_DAY in .env)")
     return p.parse_args()
 
 
 if __name__ == "__main__":
-    send_all(parse_args())
+    sys.exit(send_all(parse_args()) or 0)
